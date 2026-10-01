@@ -2,7 +2,7 @@ name: Android APK
 
 on:
   push:
-    branches: [main, "feat/android-apk"]
+    branches: [main, "feat/**", "fix/**"]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -13,7 +13,7 @@ permissions:
 jobs:
   build-apk:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
@@ -53,22 +53,55 @@ jobs:
 
       - name: Configure Android app
         run: |
-          sed -i 's/versionName "1.0"/versionName "0.2.0"/' android/app/build.gradle
+          sed -i 's/versionCode 1/versionCode 2/' android/app/build.gradle
+          sed -i 's/versionName "1.0"/versionName "0.2.1"/' android/app/build.gradle
           sed -i 's/android:theme="@style\/AppTheme"/android:theme="@style\/AppTheme" android:screenOrientation="portrait"/' android/app/src/main/AndroidManifest.xml
 
       - name: Build debug APK
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
 
+      - name: Verify APK signing and alignment
+        run: |
+          APK="android/app/build/outputs/apk/debug/app-debug.apk"
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -v 4 "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | tee apk-badging.txt
+
       - name: Prepare artifact
         run: |
           mkdir -p artifacts
-          cp android/app/build/outputs/apk/debug/app-debug.apk artifacts/Merge24-0.2.0-debug.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk artifacts/Merge24-0.2.1-debug.apk
+          cp apk-badging.txt artifacts/apk-badging.txt
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Merge24-0.2.0-debug-apk
-          path: artifacts/Merge24-0.2.0-debug.apk
+          name: Merge24-0.2.1-debug-apk
+          path: artifacts/
           if-no-files-found: error
           retention-days: 30
+
+  install-test:
+    needs: build-apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Download APK artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: Merge24-0.2.1-debug-apk
+          path: artifacts
+
+      - name: Install and launch on Android 13 emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            adb install -r artifacts/Merge24-0.2.1-debug.apk
+            adb shell pm list packages | grep com.hazhanhasani.merge24
+            adb shell monkey -p com.hazhanhasani.merge24 -c android.intent.category.LAUNCHER 1
