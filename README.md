@@ -73,3 +73,25 @@ Merge24/
 ---
 
 Built as the foundation for **Merge24**.
+
+
+## Android
+
+Merge24 ships with a Capacitor Android wrapper.
+
+```bash
+npm install
+npm run build
+npx cap add android
+npx cap sync android
+cd android
+./gradlew assembleDebug
+```
+
+The debug APK is generated at:
+
+```text
+android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+GitHub Actions also builds and publishes `Merge24-0.2.0-debug.apk` as a workflow artifact.
