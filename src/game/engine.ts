@@ -158,7 +158,7 @@ export const applyMove = (
   let merged = false
   let gained = 0
 
-  if (target === null) {
+  if (target == null) {
     board[to] = source
     board[from] = null
   } else {
